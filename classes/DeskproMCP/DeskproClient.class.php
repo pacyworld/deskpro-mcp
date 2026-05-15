@@ -121,7 +121,13 @@ class DeskproClient
     {
         $this->ensureToken();
         $headers = $this->buildHeaders();
-        return $this->http->call($endpoint, $data, 'PUT', $headers);
+        $result = $this->http->call($endpoint, $data, 'PUT', $headers);
+        // Deskpro returns 204 No Content on successful PUT (empty body).
+        // EnchiladaHTTP returns false for empty responses, so treat as success.
+        if ($result === false) {
+            return ['success' => true];
+        }
+        return $result;
     }
 
     /**
