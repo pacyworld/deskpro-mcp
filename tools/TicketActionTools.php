@@ -72,8 +72,9 @@ class TicketActionTools
     public function deskpro_add_note(int $ticket_id, string $note, string $instance = ''): array
     {
         $client = $this->manager->getClient($instance ?: null);
-        return $client->post("tickets/{$ticket_id}/notes", [
-            'note' => $note,
+        return $client->post("tickets/{$ticket_id}/messages", [
+            'message' => $note,
+            'is_note' => true,
         ]);
     }
 
@@ -122,9 +123,13 @@ class TicketActionTools
     public function deskpro_assign_ticket(int $ticket_id, int $agent_id, string $instance = ''): array
     {
         $client = $this->manager->getClient($instance ?: null);
-        return $client->put("tickets/{$ticket_id}", [
+        $result = $client->put("tickets/{$ticket_id}", [
             'agent_id' => $agent_id,
         ]);
+        if ($result === false) {
+            return ['error' => "Failed to assign ticket #{$ticket_id}."];
+        }
+        return $result;
     }
 
     /**
@@ -146,8 +151,12 @@ class TicketActionTools
     public function deskpro_change_status(int $ticket_id, string $status, string $instance = ''): array
     {
         $client = $this->manager->getClient($instance ?: null);
-        return $client->put("tickets/{$ticket_id}", [
+        $result = $client->put("tickets/{$ticket_id}", [
             'status' => $status,
         ]);
+        if ($result === false) {
+            return ['error' => "Failed to change status for ticket #{$ticket_id}."];
+        }
+        return $result;
     }
 }
