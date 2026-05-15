@@ -4,3 +4,4 @@ config/local.conf.php
 temp/
 .idea/
 .vscode/
+.phpunit.cache/

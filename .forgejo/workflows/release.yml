@@ -12,10 +12,18 @@ jobs:
       - name: Checkout
         run: git clone --depth=1 --branch=${{ github.ref_name }} ${{ github.server_url }}/${{ github.repository }}.git ${{ github.workspace }}
 
+      - name: Install dependencies
+        run: doas pkg install -y phpunit11-php84
+
       - name: Lint (syntax check)
         run: |
           cd ${{ github.workspace }}
           find bin classes includes libraries system tools -name '*.php' -exec php -l {} + 2>&1 | grep -v "^No syntax errors" | grep -v "^$" && exit 1 || true
+
+      - name: PHPUnit
+        run: |
+          cd ${{ github.workspace }}
+          phpunit --no-coverage --colors=never
 
       - name: Stamp version from tag
         run: |
