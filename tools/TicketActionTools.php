@@ -124,7 +124,7 @@ class TicketActionTools
     {
         $client = $this->manager->getClient($instance ?: null);
         $result = $client->put("tickets/{$ticket_id}", [
-            'agent_id' => $agent_id,
+            'agent' => $agent_id,
         ]);
         if ($result === false) {
             return ['error' => "Failed to assign ticket #{$ticket_id}."];

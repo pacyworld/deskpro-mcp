@@ -98,7 +98,7 @@ class TicketTools
             $data['person'] = ['email' => $person_email];
         }
         if ($department_id > 0) {
-            $data['department_id'] = $department_id;
+            $data['department'] = $department_id;
         }
         if (!empty($priority)) {
             $data['priority'] = $priority;
@@ -107,7 +107,7 @@ class TicketTools
             $data['status'] = $status;
         }
         if ($agent_id > 0) {
-            $data['agent_id'] = $agent_id;
+            $data['agent'] = $agent_id;
         }
 
         return $client->post('tickets', $data);
@@ -148,8 +148,8 @@ class TicketTools
         if (!empty($subject)) $data['subject'] = $subject;
         if (!empty($status)) $data['status'] = $status;
         if (!empty($priority)) $data['priority'] = $priority;
-        if ($department_id > 0) $data['department_id'] = $department_id;
-        if ($agent_id > 0) $data['agent_id'] = $agent_id;
+        if ($department_id > 0) $data['department'] = $department_id;
+        if ($agent_id > 0) $data['agent'] = $agent_id;
 
         if (empty($data)) {
             return ['error' => 'No fields to update.'];
