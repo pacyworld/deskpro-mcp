@@ -112,7 +112,7 @@ Requires a Deskpro admin to generate a key under Admin > Apps & Integrations > A
 ### OAuth Bearer Token
 
 Uses JWT tokens from the Deskpro web app session. No admin access needed. Tokens
-auto-refresh every 3 hours. Tokens are stored in a separate `tokens.json` file
+refreshed on-demand when near expiry (3-hour lifetime). Tokens are stored in a separate `tokens.json` file
 (beside the config by default) that is **hot-reloaded on every request** - update
 it at any time without restarting the server.
 

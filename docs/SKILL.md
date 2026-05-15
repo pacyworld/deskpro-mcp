@@ -99,8 +99,9 @@ If unsure, check whether the user has admin access. If yes, recommend **API Key*
 
 6. **Close the Deskpro browser tab** - this is critical. See warning below.
 
-7. **Verify** - run the server. Tokens auto-refresh every 3 hours.
-   Refreshed tokens are written back to `tokens.json` automatically.
+7. **Verify** - run the server. Tokens are refreshed on-demand (when a tool
+   call is made and the token is near expiry). Refreshed tokens are written
+   back to `tokens.json` automatically.
 
 ### Token File Hot-Reload
 

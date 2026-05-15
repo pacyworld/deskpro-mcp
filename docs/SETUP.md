@@ -75,8 +75,9 @@ The `Authorization` header sent is: `key YOUR_API_KEY`.
 #### OAuth Bearer Token
 
 Uses JWT tokens from the Deskpro web app session. Does not require admin access
-to set up, but tokens expire every 3 hours. The server automatically refreshes
-them using the refresh token and persists new tokens for future use.
+to set up, but tokens expire every 3 hours. The server refreshes them on-demand
+(when a tool call is made and the token is near expiry) and persists new tokens
+for future use.
 
 Tokens are stored in a separate **token file** (`tokens.json`), located in the
 same directory as the config file by default. This file is hot-reloaded on every
