@@ -30,7 +30,7 @@ jobs:
           cd ${{ github.workspace }}
           VERSION="${{ github.ref_name }}"
           VERSION="${VERSION#v}"
-          sed -i '' "s/define('APPLICATION_VERSION', '[^']*')/define('APPLICATION_VERSION', '${VERSION}')/" system/app.conf.php
+          sed -i "s/define('APPLICATION_VERSION', '[^']*')/define('APPLICATION_VERSION', '${VERSION}')/" system/app.conf.php
           grep APPLICATION_VERSION system/app.conf.php
 
       - name: Build PHAR
@@ -70,10 +70,16 @@ jobs:
             done
           else
             echo "Creating release ${TAG}..."
+            # Detect pre-release (tags containing -alpha, -beta, -rc, etc.)
+            PRERELEASE=false
+            if echo "${TAG}" | grep -qE '-(alpha|beta|rc|dev)'; then
+              PRERELEASE=true
+            fi
+
             RELEASE=$(curl -s -X POST "${API}/repos/${REPO}/releases" \
               -H "Authorization: token ${{ secrets.FORGE_TOKEN }}" \
               -H "Content-Type: application/json" \
-              -d "{\"tag_name\":\"${TAG}\",\"name\":\"${TAG}\",\"body\":\"Release ${TAG}\",\"draft\":false,\"prerelease\":false}")
+              -d "{\"tag_name\":\"${TAG}\",\"name\":\"${TAG}\",\"body\":\"Release ${TAG}\\n\\nSee CHANGELOG.md for details.\",\"draft\":false,\"prerelease\":${PRERELEASE}}")
             RELEASE_ID=$(echo "$RELEASE" | jq -r '.id')
 
             if [ "$RELEASE_ID" = "null" ] || [ -z "$RELEASE_ID" ]; then
