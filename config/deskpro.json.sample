@@ -1,0 +1,21 @@
+{
+    "_comment": "Multi-instance config. Legacy single-instance format (without 'instances' key) is also supported.",
+    "default": "my-helpdesk",
+    "instances": {
+        "my-helpdesk": {
+            "_comment": "API Key auth (recommended for stable access, requires admin to generate key)",
+            "auth_method": "apikey",
+            "api_token": "YOUR_API_KEY",
+            "site_url": "https://yourcompany.deskpro.com",
+            "description": "Primary helpdesk (API key)"
+        },
+        "other-helpdesk": {
+            "_comment": "OAuth Bearer token auth (uses JWT from browser session, auto-refreshes)",
+            "auth_method": "token",
+            "access_token": "eyJ...",
+            "refresh_token": "def502...",
+            "site_url": "https://other.deskpro.com",
+            "description": "Secondary helpdesk (OAuth token)"
+        }
+    }
+}

@@ -1,0 +1,116 @@
+#!/usr/bin/env php
+<?php
+/**
+ * Deskpro MCP Server - stdio Entry Point
+ *
+ * Deskpro helpdesk management via the Model Context Protocol.
+ * Communicates over stdin/stdout using JSON-RPC 2.0.
+ *
+ * Usage:
+ *   php bin/deskpro-mcp
+ *
+ * Environment:
+ *   DESKPRO_CONFIG  Path to deskpro.json configuration file
+ *
+ * @package    DeskproMCP
+ * @author     Daniel Morante
+ * @copyright  2026 The Daniel Morante Company, Inc.
+ * @license    BSD-2-Clause
+ */
+
+// Enchilada Framework bootstrap
+require_once dirname(__DIR__) . '/system/bootstrap.inc.php';
+
+use DeskproMCP\InstanceManager;
+
+// --- Configuration ---
+
+$configPath = getenv('DESKPRO_CONFIG') ?: null;
+
+// Check CLI argument: --config=/path/to/deskpro.json
+foreach ($argv ?? [] as $arg) {
+    if (str_starts_with($arg, '--config=')) {
+        $configPath = substr($arg, 9);
+    }
+}
+
+// Default config location
+if ($configPath === null) {
+    $candidates = [
+        APPLICATION_CONFDIR . 'deskpro.json',
+        getenv('HOME') . '/.config/deskpro-mcp/deskpro.json',
+        '/usr/local/etc/deskpro-mcp/deskpro.json',
+    ];
+    foreach ($candidates as $candidate) {
+        if (file_exists($candidate)) {
+            $configPath = $candidate;
+            break;
+        }
+    }
+}
+
+if ($configPath === null || !file_exists($configPath)) {
+    fwrite(STDERR, "[deskpro-mcp] ERROR: No configuration file found.\n");
+    fwrite(STDERR, "  Set DESKPRO_CONFIG environment variable or use --config=/path/to/deskpro.json\n");
+    fwrite(STDERR, "  Or place deskpro.json in config/ directory.\n");
+    exit(1);
+}
+
+// --- Bootstrap ---
+
+function debug(string $message): void
+{
+    fwrite(STDERR, "[deskpro-mcp] " . $message . "\n");
+}
+
+try {
+    $manager = InstanceManager::fromFile($configPath);
+} catch (\Exception $e) {
+    fwrite(STDERR, "[deskpro-mcp] ERROR: " . $e->getMessage() . "\n");
+    exit(1);
+}
+
+$instanceCount = $manager->count();
+debug("Loaded {$instanceCount} instance(s) from {$configPath} (default: {$manager->getDefault()})");
+
+// Log per-instance auth info
+foreach ($manager->listInstances() as $name => $info) {
+    $marker = $info['is_default'] ? ' [default]' : '';
+    debug("  {$name}: {$info['auth_method']}{$marker}");
+}
+
+// --- Create MCP Server ---
+
+$server = new \EnchiladaMCP\McpServer(APPLICATION_SLUG, APPLICATION_VERSION);
+
+$server->setInstructions(
+    'Deskpro MCP server for helpdesk ticket management. '
+    . 'Use deskpro_help for setup guidance, deskpro_tool_categories to explore available tools. '
+    . 'All tools accept an optional instance parameter for multi-site configurations.'
+);
+
+// Register tools
+$server->register(new \InstanceTools($manager));
+debug("Registered tools: InstanceTools");
+
+$server->register(new \TicketTools($manager));
+debug("Registered tools: TicketTools");
+
+$server->register(new \TicketActionTools($manager));
+debug("Registered tools: TicketActionTools");
+
+$server->register(new \LookupTools($manager));
+debug("Registered tools: LookupTools");
+
+$server->register(new \MetaTools($manager, APPLICATION_VERSION));
+debug("Registered tools: MetaTools");
+
+// --- Transport ---
+
+$transport = new \EnchiladaMCP\StdioTransport($server);
+$transport->setLogger('debug');
+
+// Enter event loop
+$transport->run();
+
+debug("MCP server stopped");

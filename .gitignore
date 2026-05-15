@@ -1,0 +1,6 @@
+config/deskpro.json
+config/local.conf.php
+*.phar
+temp/
+.idea/
+.vscode/

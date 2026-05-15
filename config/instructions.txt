@@ -1,0 +1,4 @@
+Deskpro MCP server for helpdesk ticket management.
+Use deskpro_help for setup guidance, deskpro_tool_categories to explore available tools.
+Use deskpro_list_instances to see configured helpdesks.
+All tools accept an optional instance parameter to target a specific Deskpro site.
