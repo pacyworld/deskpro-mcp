@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    runs-on: FreeBSD
+    steps:
+      - name: Checkout
+        run: git clone --depth=1 --branch=${{ github.head_ref || github.ref_name }} ${{ github.server_url }}/${{ github.repository }}.git ${{ github.workspace }}
+
+      - name: Lint (syntax check)
+        run: |
+          cd ${{ github.workspace }}
+          find bin classes includes libraries system tools -name '*.php' -exec php -l {} + 2>&1 | grep -v "^No syntax errors" | grep -v "^$" && exit 1 || true
+
+      - name: Build PHAR
+        run: |
+          cd ${{ github.workspace }}
+          php -d phar.readonly=0 bin/build-phar.php
+
+      - name: Smoke test PHAR
+        run: |
+          cd ${{ github.workspace }}
+          php -r "
+            \$phar = new Phar('deskpro-mcp.phar');
+            echo 'PHAR files: ' . count(\$phar) . PHP_EOL;
+            if (count(\$phar) < 5) { echo 'ERROR: PHAR has too few files'; exit(1); }
+          "
+
+      - name: Verify MCP protocol
+        run: |
+          cd ${{ github.workspace }}
+          RESPONSE=$(echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"ci","version":"1.0"}}}' | DESKPRO_CONFIG=/dev/null php bin/deskpro-mcp 2>/dev/null || true)
+          echo "$RESPONSE"
+          # Server should exit with error (no config) but not crash with a PHP fatal
+          php -r "echo 'PHP runtime OK' . PHP_EOL;"

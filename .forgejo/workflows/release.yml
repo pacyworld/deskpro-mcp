@@ -1,0 +1,86 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: FreeBSD
+    steps:
+      - name: Checkout
+        run: git clone --depth=1 --branch=${{ github.ref_name }} ${{ github.server_url }}/${{ github.repository }}.git ${{ github.workspace }}
+
+      - name: Lint (syntax check)
+        run: |
+          cd ${{ github.workspace }}
+          find bin classes includes libraries system tools -name '*.php' -exec php -l {} + 2>&1 | grep -v "^No syntax errors" | grep -v "^$" && exit 1 || true
+
+      - name: Stamp version from tag
+        run: |
+          cd ${{ github.workspace }}
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          sed -i '' "s/define('APPLICATION_VERSION', '[^']*')/define('APPLICATION_VERSION', '${VERSION}')/" system/app.conf.php
+          grep APPLICATION_VERSION system/app.conf.php
+
+      - name: Build PHAR
+        run: |
+          cd ${{ github.workspace }}
+          php -d phar.readonly=0 bin/build-phar.php
+          ls -lh deskpro-mcp.phar
+
+      - name: Smoke test PHAR
+        run: |
+          cd ${{ github.workspace }}
+          php -r "
+            \$phar = new Phar('deskpro-mcp.phar');
+            echo 'PHAR files: ' . count(\$phar) . PHP_EOL;
+            if (count(\$phar) < 5) { echo 'ERROR: PHAR has too few files'; exit(1); }
+          "
+
+      - name: Create release and upload PHAR
+        run: |
+          cd ${{ github.workspace }}
+          TAG="${{ github.ref_name }}"
+          REPO="${{ github.repository }}"
+          API="${{ github.server_url }}/api/v1"
+
+          # Check if release already exists for this tag
+          EXISTING=$(curl -s "${API}/repos/${REPO}/releases/tags/${TAG}" \
+            -H "Authorization: token ${{ secrets.FORGE_TOKEN }}")
+          RELEASE_ID=$(echo "$EXISTING" | jq -r '.id // empty')
+
+          if [ -n "$RELEASE_ID" ]; then
+            echo "Release ${TAG} already exists (ID: ${RELEASE_ID}), removing old PHAR assets..."
+            ASSETS=$(echo "$EXISTING" | jq -r '.assets[]? | select(.name == "deskpro-mcp.phar") | .id')
+            for ASSET_ID in $ASSETS; do
+              echo "Deleting asset ${ASSET_ID}"
+              curl -s -X DELETE "${API}/repos/${REPO}/releases/${RELEASE_ID}/assets/${ASSET_ID}" \
+                -H "Authorization: token ${{ secrets.FORGE_TOKEN }}"
+            done
+          else
+            echo "Creating release ${TAG}..."
+            RELEASE=$(curl -s -X POST "${API}/repos/${REPO}/releases" \
+              -H "Authorization: token ${{ secrets.FORGE_TOKEN }}" \
+              -H "Content-Type: application/json" \
+              -d "{\"tag_name\":\"${TAG}\",\"name\":\"${TAG}\",\"body\":\"Release ${TAG}\",\"draft\":false,\"prerelease\":false}")
+            RELEASE_ID=$(echo "$RELEASE" | jq -r '.id')
+
+            if [ "$RELEASE_ID" = "null" ] || [ -z "$RELEASE_ID" ]; then
+              echo "ERROR: Failed to create release"
+              echo "$RELEASE"
+              exit 1
+            fi
+          fi
+
+          echo "Release ID: ${RELEASE_ID}"
+
+          # Upload PHAR asset
+          curl -s -X POST "${API}/repos/${REPO}/releases/${RELEASE_ID}/assets?name=deskpro-mcp.phar" \
+            -H "Authorization: token ${{ secrets.FORGE_TOKEN }}" \
+            -H "Content-Type: application/octet-stream" \
+            --data-binary @deskpro-mcp.phar
+
+          echo "Uploaded deskpro-mcp.phar to release ${TAG}"
