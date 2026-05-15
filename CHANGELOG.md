@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.1.0] - 2026-05-15
 
 ### Added
 
@@ -20,6 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instead of silently sending a dead token (fixes #2)
 - Refresh request body now matches Deskpro protocol (`access_token` + `refresh_token: "COOKIE"`)
 - Refresh token is no longer overwritten with the literal string "COOKIE" from response
+- Fixed `ticket_fields` endpoint (correct path: `ticket_custom_fields`)
+- Fixed `create_ticket`, `update_ticket`, `assign_ticket` API field names
+  (`department_id` -> `department`, `agent_id` -> `agent`)
+- Fixed PUT 204 No Content handling (no longer treated as failure)
+- Fixed uninitialized typed property error on token file reload
+- Synced EnchiladaHTTP from upstream (adds `getHttpCode()` support)
 
 ### Changed
 
@@ -46,4 +52,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Forgejo release workflow (version stamp, PHAR upload on tagged release)
 - Comprehensive documentation: README, SETUP.md, TOOLS.md, SKILL.md
 
+[1.1.0]: https://pacyworld.dev/pacyworld/deskpro-mcp/releases/tag/v1.1.0
 [1.0.0]: https://pacyworld.dev/pacyworld/deskpro-mcp/releases/tag/v1.0.0
