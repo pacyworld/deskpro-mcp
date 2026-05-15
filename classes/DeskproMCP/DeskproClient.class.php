@@ -31,13 +31,13 @@ class DeskproClient
     private string $authMethod;
 
     /** @var string API key for apikey auth */
-    private string $apiKey;
+    private string $apiKey = '';
 
     /** @var string Bearer token for token auth */
-    private string $accessToken;
+    private string $accessToken = '';
 
     /** @var string Refresh token for token auth */
-    private string $refreshToken;
+    private string $refreshToken = '';
 
     /** @var int Token expiry timestamp */
     private int $tokenExpiry = 0;
