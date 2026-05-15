@@ -111,18 +111,34 @@ Requires a Deskpro admin to generate a key under Admin > Apps & Integrations > A
 
 ### OAuth Bearer Token
 
-Uses JWT tokens from the Deskpro web app session. No admin access needed. Tokens auto-refresh every 3 hours; the server writes refreshed tokens back to the config file.
+Uses JWT tokens from the Deskpro web app session. No admin access needed. Tokens
+auto-refresh every 3 hours. Tokens are stored in a separate `tokens.json` file
+(beside the config by default) that is **hot-reloaded on every request** - update
+it at any time without restarting the server.
 
+**Config** (`deskpro.json`):
 ```json
 {
     "auth_method": "token",
-    "access_token": "eyJ...",
-    "refresh_token": "def502...",
     "site_url": "https://yourcompany.deskpro.com"
 }
 ```
 
-Get tokens from your browser cookies: `app_access_token` and `app_refresh_token` (Application > Cookies in developer tools).
+**Token file** (`tokens.json`, same directory):
+```json
+{
+    "access_token": "eyJ...",
+    "refresh_token": "def502..."
+}
+```
+
+Get tokens from your browser cookies: `app_access_token` and `app_refresh_token`
+(Application > Cookies in developer tools).
+
+> **Warning:** Close the Deskpro browser tab after extracting tokens. Deskpro
+> rotates refresh tokens on use - if the browser refreshes while the MCP server
+> is running, it will invalidate the server's refresh token. See
+> [SETUP.md](docs/SETUP.md) for details.
 
 ### Multi-Instance
 

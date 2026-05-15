@@ -76,7 +76,7 @@ If unsure, check whether the user has admin access. If yes, recommend **API Key*
 
 2. **Identify the site URL** - the domain shown in the browser address bar.
 
-3. **Create the config file**:
+3. **Create the config directory**:
    ```bash
    mkdir -p ~/.config/deskpro-mcp
    ```
@@ -85,14 +85,45 @@ If unsure, check whether the user has admin access. If yes, recommend **API Key*
    ```json
    {
        "auth_method": "token",
-       "access_token": "<app_access_token cookie value>",
-       "refresh_token": "<app_refresh_token cookie value>",
        "site_url": "https://<company>.deskpro.com"
    }
    ```
 
-5. **Verify** - run the server. Tokens auto-refresh every 3 hours.
-   The server writes refreshed tokens back to the config file.
+5. **Write the token file** to `~/.config/deskpro-mcp/tokens.json`:
+   ```json
+   {
+       "access_token": "<app_access_token cookie value>",
+       "refresh_token": "<app_refresh_token cookie value>"
+   }
+   ```
+
+6. **Close the Deskpro browser tab** - this is critical. See warning below.
+
+7. **Verify** - run the server. Tokens auto-refresh every 3 hours.
+   Refreshed tokens are written back to `tokens.json` automatically.
+
+### Token File Hot-Reload
+
+The `tokens.json` file is re-read before every API request. If tokens become
+invalid, you (or an AI agent) can update `tokens.json` at any time and the
+server will pick up the change on the next call - no restart needed.
+
+### IMPORTANT: Browser Race Condition
+
+Deskpro uses **single-use refresh tokens**. When a refresh token is used (by
+the browser OR the MCP server), it is rotated and the old one is permanently
+invalidated.
+
+If the Deskpro web app is open in a browser simultaneously:
+1. The browser periodically refreshes its session (every ~3 hours)
+2. This rotates the refresh token, invalidating the one in `tokens.json`
+3. The MCP server's next refresh attempt fails
+4. All subsequent API calls return 401
+
+**Prevention:** Always close the Deskpro browser tab after extracting tokens.
+
+**Recovery:** If this happens, log into Deskpro fresh, extract new cookies,
+update `tokens.json`. The server recovers on the next request without restart.
 
 ---
 
@@ -217,9 +248,11 @@ If any step fails, use `deskpro_error_guide` with the error code for troubleshoo
 | Symptom | Likely cause | Resolution |
 |---------|-------------|------------|
 | 401 Unauthorized | Invalid or expired credentials | Check `api_token` or refresh tokens |
+| 401 + "Token refresh failed" | Browser stole the refresh token | Close browser tab, extract fresh tokens into `tokens.json` |
 | 403 Forbidden | Insufficient permissions | Verify agent permissions in Deskpro admin |
-| Token refresh fails | Refresh token expired | Extract fresh tokens from browser |
+| Token refresh fails | Refresh token expired or rotated by browser | Extract fresh tokens, update `tokens.json` (no restart needed) |
 | No config found | Config file not in search path | Set `DESKPRO_CONFIG` env var or use `--config=` |
 | Connection timeout | Network or firewall issue | Verify site URL is reachable |
+| Tokens not updating | `tokens.json` missing or wrong path | Verify file exists beside config, or set `token_file` explicitly |
 
 Use `deskpro_error_guide` for detailed error resolution steps.

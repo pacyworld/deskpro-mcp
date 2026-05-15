@@ -76,28 +76,61 @@ The `Authorization` header sent is: `key YOUR_API_KEY`.
 
 Uses JWT tokens from the Deskpro web app session. Does not require admin access
 to set up, but tokens expire every 3 hours. The server automatically refreshes
-them using the refresh token and writes the new tokens back to the config file.
+them using the refresh token and persists new tokens for future use.
+
+Tokens are stored in a separate **token file** (`tokens.json`), located in the
+same directory as the config file by default. This file is hot-reloaded on every
+API request, so you can update tokens externally without restarting the server.
+
+**Minimal config** (tokens.json is auto-detected beside the config file):
 
 ```json
 {
-    "default": "my-helpdesk",
-    "instances": {
-        "my-helpdesk": {
-            "auth_method": "token",
-            "access_token": "eyJ...",
-            "refresh_token": "def502...",
-            "site_url": "https://yourcompany.deskpro.com",
-            "description": "Primary helpdesk"
-        }
-    }
+    "auth_method": "token",
+    "site_url": "https://yourcompany.deskpro.com"
+}
+```
+
+**Token file** (`tokens.json` in the same directory):
+
+```json
+{
+    "access_token": "eyJ...",
+    "refresh_token": "def502..."
+}
+```
+
+**Custom token file path** (optional):
+
+```json
+{
+    "auth_method": "token",
+    "token_file": "/path/to/tokens.json",
+    "site_url": "https://yourcompany.deskpro.com"
 }
 ```
 
 **To obtain tokens:** log into the Deskpro agent web app, then extract the
 `app_access_token` and `app_refresh_token` cookies from your browser's
-developer tools (Application > Cookies).
+developer tools (Application > Cookies). Save them into `tokens.json`.
 
 The `Authorization` header sent is: `Bearer <JWT>`.
+
+> **WARNING: Browser Token Race Condition**
+>
+> Deskpro rotates refresh tokens on use - each refresh token can only be used
+> once. If the Deskpro web app is open in a browser at the same time as the
+> MCP server, the browser will periodically refresh its session and **invalidate
+> the refresh token** that the MCP server is holding.
+>
+> When this happens, the MCP server's next refresh attempt will fail and API
+> calls will return 401 errors.
+>
+> **Recommendations:**
+> - Close the Deskpro browser tab after extracting tokens
+> - If you must keep the browser open, re-extract tokens after any browser
+>   refresh and update `tokens.json` (no server restart needed)
+> - For long-lived, race-free access, use the **API Key** method instead
 
 ### Multi-Instance Configuration
 
@@ -215,16 +248,29 @@ source) and communicate over stdin/stdout.
 ### 401 Unauthorized errors
 
 - **API Key**: verify `api_token` is correct and the key has not been revoked.
-- **OAuth token**: both tokens may have expired. Get fresh tokens from the
-  browser and update the config. See `deskpro_error_guide` for details.
+- **OAuth token**: the access token (JWT) has expired and auto-refresh failed.
+  Common causes:
+  - The refresh token was invalidated by a browser session (see below).
+  - The refresh token itself expired (unclear TTL, possibly days/weeks).
+  - Fix: extract fresh tokens from the browser and update `tokens.json`.
+    No server restart is needed - the token file is hot-reloaded.
 
-### Token refresh fails
+### Token refresh fails / Browser race condition
 
+- **Most common cause:** A Deskpro browser tab refreshed its session, rotating
+  the refresh token. Deskpro tokens are single-use - once the browser uses the
+  refresh token, the copy held by the MCP server is permanently dead.
+- **Fix:** Close the browser tab, log in fresh, extract new cookies into
+  `tokens.json`. The server picks up changes on the next request.
+- **Prevention:** Close the Deskpro browser tab after extracting tokens.
+  Alternatively, use the API Key method which has no expiry or rotation.
 - The refresh endpoint is `POST /agent-api/authenticate/refresh` (not the
   standard OAuth `/oauth/token` endpoint, which returns 500).
-- Both the JSON body (`refresh_token`) and a cookie (`app_refresh_token`)
-  must contain the refresh token value.
-- If the refresh token itself has expired, you need to log in again.
+- The request body must include `access_token`, `refresh_token: "COOKIE"`,
+  and `isSession: false`. The actual refresh token goes in the
+  `Cookie: app_refresh_token=...` header.
+- If refresh fails, the server throws a RuntimeException with a clear
+  message explaining the race condition and how to fix it.
 
 ### Permission errors (403)
 

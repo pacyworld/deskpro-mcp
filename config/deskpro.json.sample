@@ -10,12 +10,25 @@
             "description": "Primary helpdesk (API key)"
         },
         "other-helpdesk": {
-            "_comment": "OAuth Bearer token auth (uses JWT from browser session, auto-refreshes)",
+            "_comment": "OAuth Bearer token auth. Tokens live in tokens.json beside this config (default). WARNING: Close the Deskpro browser tab after extracting tokens - the browser races to refresh and will invalidate the MCP server's copy.",
+            "auth_method": "token",
+            "site_url": "https://other.deskpro.com",
+            "description": "Secondary helpdesk (OAuth token, uses default tokens.json)"
+        },
+        "custom-path": {
+            "_comment": "OAuth with explicit token_file path (hot-reloaded on each request, no restart needed)",
+            "auth_method": "token",
+            "token_file": "/path/to/my-tokens.json",
+            "site_url": "https://company.deskpro.com",
+            "description": "Helpdesk with custom token file path"
+        },
+        "inline-legacy": {
+            "_comment": "OAuth with inline tokens (legacy, still supported but token_file is preferred)",
             "auth_method": "token",
             "access_token": "eyJ...",
             "refresh_token": "def502...",
-            "site_url": "https://other.deskpro.com",
-            "description": "Secondary helpdesk (OAuth token)"
+            "site_url": "https://legacy.deskpro.com",
+            "description": "Legacy inline token format"
         }
     }
 }

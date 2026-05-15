@@ -45,6 +45,9 @@ class DeskproClient
     /** @var string|null Path to config file for persisting refreshed tokens */
     private ?string $configPath;
 
+    /** @var string|null Path to external token file (hot-reloaded on each request) */
+    private ?string $tokenFile;
+
     /** @var string Instance name (for config persistence) */
     private string $instanceName;
 
@@ -61,6 +64,10 @@ class DeskproClient
         $this->authMethod = $config['auth_method'] ?? 'apikey';
         $this->instanceName = $instanceName;
         $this->configPath = $configPath;
+        $this->tokenFile = $config['token_file']
+            ?? ($this->authMethod === 'token' && $configPath
+                ? dirname($configPath) . '/tokens.json'
+                : null);
 
         if ($this->authMethod === 'apikey') {
             $this->apiKey = $config['api_token'] ?? '';
@@ -68,9 +75,7 @@ class DeskproClient
             $this->refreshToken = '';
         } else {
             $this->apiKey = '';
-            $this->accessToken = $config['access_token'] ?? '';
-            $this->refreshToken = $config['refresh_token'] ?? '';
-            $this->parseTokenExpiry();
+            $this->loadTokens($config);
         }
 
         $this->http = new \EnchiladaHTTP($this->siteUrl . '/api/v2');
@@ -215,6 +220,11 @@ class DeskproClient
 
     /**
      * Ensure the access token is valid, refreshing if needed.
+     *
+     * Hot-reloads tokens from external token_file if configured,
+     * allowing updates without server restart.
+     *
+     * @throws \RuntimeException If token refresh fails
      */
     private function ensureToken(): void
     {
@@ -222,20 +232,40 @@ class DeskproClient
             return;
         }
 
+        // Hot-reload from external token file (allows live updates without restart)
+        if ($this->tokenFile !== null) {
+            $this->reloadTokenFile();
+        }
+
         // Refresh if token expires within 5 minutes
         if ($this->tokenExpiry > 0 && $this->tokenExpiry < (time() + 300)) {
-            $this->refreshAccessToken();
+            if (!$this->refreshAccessToken()) {
+                throw new \RuntimeException(
+                    'Token refresh failed. The refresh token is likely expired or was '
+                    . 'invalidated by a browser session refresh (Deskpro rotates refresh '
+                    . 'tokens on use - if the browser refreshed first, this token is dead). '
+                    . 'Fix: close the Deskpro browser tab to prevent token races, then update '
+                    . ($this->tokenFile
+                        ? $this->tokenFile
+                        : 'the config file'
+                    )
+                    . ' with fresh tokens from a new browser login '
+                    . '(capture HAR of POST /agent-api/authenticate/refresh).'
+                );
+            }
         }
     }
 
     /**
      * Refresh the OAuth access token using the refresh token.
+     *
+     * @return bool True if refresh succeeded, false otherwise
      */
-    private function refreshAccessToken(): void
+    private function refreshAccessToken(): bool
     {
         if (empty($this->refreshToken)) {
             fwrite(STDERR, "[deskpro-mcp] WARNING: No refresh token available, cannot refresh.\n");
-            return;
+            return false;
         }
 
         fwrite(STDERR, "[deskpro-mcp] Refreshing access token...\n");
@@ -245,29 +275,99 @@ class DeskproClient
 
         $result = $refreshHttp->call(
             'agent-api/authenticate/refresh',
-            ['refresh_token' => $this->refreshToken],
+            [
+                'access_token' => $this->accessToken,
+                'refresh_token' => 'COOKIE',
+                'isSession' => false,
+            ],
             'POST',
             ['Content-Type: application/json', 'Cookie: app_refresh_token=' . $this->refreshToken]
         );
 
         if (is_array($result) && !empty($result['access_token'])) {
             $this->accessToken = $result['access_token'];
-            if (!empty($result['refresh_token'])) {
+            if (!empty($result['refresh_token']) && $result['refresh_token'] !== 'COOKIE') {
                 $this->refreshToken = $result['refresh_token'];
             }
             $this->parseTokenExpiry();
             $this->persistTokens();
-            fwrite(STDERR, "[deskpro-mcp] Token refreshed successfully (expires in {$result['expires_in']}s).\n");
+            fwrite(STDERR, "[deskpro-mcp] Token refreshed successfully (expires in " . ($result['expires_in'] ?? '?') . "s).\n");
+            return true;
+        }
+
+        fwrite(STDERR, "[deskpro-mcp] ERROR: Token refresh failed. Response: " . json_encode($result) . "\n");
+        return false;
+    }
+
+    /**
+     * Load tokens from config or external token file.
+     *
+     * @param array $config Instance configuration
+     */
+    private function loadTokens(array $config): void
+    {
+        if ($this->tokenFile !== null && file_exists($this->tokenFile)) {
+            $this->reloadTokenFile();
         } else {
-            fwrite(STDERR, "[deskpro-mcp] WARNING: Token refresh failed.\n");
+            $this->accessToken = $config['access_token'] ?? '';
+            $this->refreshToken = $config['refresh_token'] ?? '';
+            $this->parseTokenExpiry();
         }
     }
 
     /**
-     * Persist refreshed tokens back to the config file.
+     * Hot-reload tokens from the external token file.
+     *
+     * This is called before every API request when token_file is configured,
+     * allowing the user or another process to update tokens without restarting
+     * the MCP server.
+     */
+    private function reloadTokenFile(): void
+    {
+        if ($this->tokenFile === null || !file_exists($this->tokenFile)) {
+            return;
+        }
+
+        $json = file_get_contents($this->tokenFile);
+        $tokens = json_decode($json, true);
+        if ($tokens === null) {
+            return;
+        }
+
+        $newAccess = $tokens['access_token'] ?? '';
+        $newRefresh = $tokens['refresh_token'] ?? '';
+
+        // Only re-parse if tokens actually changed
+        if ($newAccess !== $this->accessToken || $newRefresh !== $this->refreshToken) {
+            $this->accessToken = $newAccess;
+            $this->refreshToken = $newRefresh;
+            $this->parseTokenExpiry();
+            fwrite(STDERR, "[deskpro-mcp] Tokens reloaded from {$this->tokenFile}\n");
+        }
+    }
+
+    /**
+     * Persist refreshed tokens back to storage.
+     *
+     * Writes to the external token file if configured, otherwise updates
+     * the main config file.
      */
     private function persistTokens(): void
     {
+        // Prefer external token file
+        if ($this->tokenFile !== null) {
+            $tokens = [
+                'access_token' => $this->accessToken,
+                'refresh_token' => $this->refreshToken,
+            ];
+            file_put_contents(
+                $this->tokenFile,
+                json_encode($tokens, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n"
+            );
+            return;
+        }
+
+        // Fall back to config file
         if ($this->configPath === null || !file_exists($this->configPath)) {
             return;
         }

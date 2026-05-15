@@ -1,4 +1,5 @@
 config/deskpro.json
+config/tokens.json
 config/local.conf.php
 *.phar
 temp/

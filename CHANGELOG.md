@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- External token file (`tokens.json`) with hot-reload on every request
+- Default token file convention: `tokens.json` beside the config file
+- `token_file` config option to specify a custom token file path
+- Clear error messaging about browser token race condition on refresh failure
+
+### Fixed
+
+- Token refresh now returns success/failure; `ensureToken()` throws on failure
+  instead of silently sending a dead token (fixes #2)
+- Refresh request body now matches Deskpro protocol (`access_token` + `refresh_token: "COOKIE"`)
+- Refresh token is no longer overwritten with the literal string "COOKIE" from response
+
+### Changed
+
+- Token persistence prefers external token file over inline config
+- OAuth token config no longer requires inline `access_token`/`refresh_token`
+  (reads from `tokens.json` by default)
+
 ## [1.0.0] - 2026-05-15
 
 ### Added
