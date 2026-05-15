@@ -102,7 +102,7 @@ class LookupTools
     public function deskpro_get_ticket_fields(string $instance = ''): array
     {
         $client = $this->manager->getClient($instance ?: null);
-        return $client->get('ticket_fields');
+        return $client->get('ticket_custom_fields');
     }
 
     /**
