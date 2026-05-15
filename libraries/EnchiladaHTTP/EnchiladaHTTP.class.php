@@ -61,6 +61,7 @@ class EnchiladaHTTP {
 	protected $ca_cert;
 	protected $plaintext_auth;
 	protected $verify_ssl = true;
+	protected $last_http_code = 0;
 
 	/**
 	 * Create a new instance
@@ -182,6 +183,7 @@ class EnchiladaHTTP {
 		}
 
 		$result = curl_exec($ch);
+		$this->last_http_code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
 
 		if ($result === false && $this->debug) {
 			// Surface transport-level errors when debugging is enabled
@@ -226,6 +228,7 @@ class EnchiladaHTTP {
 		switch ($key) {
 			case 'Endpoint': return $this->api_endpoint;
 			case 'Timeout': return $this->request_timeout;
+			case 'HttpCode': return $this->last_http_code;
 			default: return null;
 		}
 	}
@@ -239,6 +242,15 @@ class EnchiladaHTTP {
 		if(is_int($timeout)){
 			$this->request_timeout = $timeout;
 		}
+	}
+
+	/**
+	 * Returns the HTTP status code from the most recent request.
+	 *
+	 * @return int HTTP status code (e.g., 200, 401, 404, 500). Returns 0 if no request has been made.
+	 */
+	public function getHttpCode(): int {
+		return $this->last_http_code;
 	}
 
 	/**

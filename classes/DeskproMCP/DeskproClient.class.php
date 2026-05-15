@@ -123,8 +123,7 @@ class DeskproClient
         $headers = $this->buildHeaders();
         $result = $this->http->call($endpoint, $data, 'PUT', $headers);
         // Deskpro returns 204 No Content on successful PUT (empty body).
-        // EnchiladaHTTP returns false for empty responses, so treat as success.
-        if ($result === false) {
+        if ($result === false && $this->http->getHttpCode() >= 200 && $this->http->getHttpCode() < 300) {
             return ['success' => true];
         }
         return $result;
@@ -150,7 +149,7 @@ class DeskproClient
      */
     public function getLastHttpCode(): int
     {
-        return (int) ($this->http->getHttpCode ?? 0);
+        return $this->http->getHttpCode();
     }
 
     /**
