@@ -155,7 +155,11 @@ class TicketTools
             return ['error' => 'No fields to update.'];
         }
 
-        return $client->put("tickets/{$ticket_id}", $data);
+        $result = $client->put("tickets/{$ticket_id}", $data);
+        if ($result === false) {
+            return ['error' => "Failed to update ticket #{$ticket_id}."];
+        }
+        return $result;
     }
 
     /**
@@ -197,12 +201,26 @@ class TicketTools
             'count' => min(200, max(1, $count)),
         ];
 
-        if (!empty($query)) $params['q'] = $query;
         if (!empty($status)) $params['status'] = $status;
         if ($agent_id > 0) $params['agent'] = $agent_id;
         if ($department_id > 0) $params['department'] = $department_id;
         if (!empty($order_by)) $params['order_by'] = $order_by;
         if (!empty($order_dir)) $params['order_dir'] = $order_dir;
+
+        // Keyword search requires the /search endpoint; GET /tickets ignores 'q'
+        if (!empty($query)) {
+            $searchParams = [
+                'q' => $query,
+                'type' => 'ticket',
+                'page' => $params['page'],
+                'count' => $params['count'],
+            ];
+            $result = $client->get('search', $searchParams);
+            if (!is_array($result)) {
+                return ['error' => 'Search request failed.'];
+            }
+            return $result;
+        }
 
         return $client->get('tickets', $params);
     }
