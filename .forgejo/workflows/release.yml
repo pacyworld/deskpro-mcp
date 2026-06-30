@@ -30,7 +30,7 @@ jobs:
           cd ${{ github.workspace }}
           VERSION="${{ github.ref_name }}"
           VERSION="${VERSION#v}"
-          sed -i "s/define('APPLICATION_VERSION', '[^']*')/define('APPLICATION_VERSION', '${VERSION}')/" system/app.conf.php
+          sed -i '' "s/define('APPLICATION_VERSION', '[^']*')/define('APPLICATION_VERSION', '${VERSION}')/" system/app.conf.php
           grep APPLICATION_VERSION system/app.conf.php
 
       - name: Build PHAR
