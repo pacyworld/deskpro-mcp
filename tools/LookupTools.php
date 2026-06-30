@@ -34,6 +34,7 @@ class LookupTools
      */
     #[McpTool(
         name: 'deskpro_list_departments',
+        readOnlyHint: true,
         description: 'List available Deskpro departments.',
         inputSchema: [
             'type' => 'object',
@@ -53,6 +54,7 @@ class LookupTools
      */
     #[McpTool(
         name: 'deskpro_list_agents',
+        readOnlyHint: true,
         description: 'List Deskpro agents (support staff).',
         inputSchema: [
             'type' => 'object',
@@ -72,6 +74,7 @@ class LookupTools
      */
     #[McpTool(
         name: 'deskpro_list_statuses',
+        readOnlyHint: true,
         description: 'List available Deskpro ticket statuses.',
         inputSchema: [
             'type' => 'object',
@@ -91,6 +94,7 @@ class LookupTools
      */
     #[McpTool(
         name: 'deskpro_get_ticket_fields',
+        readOnlyHint: true,
         description: 'Get Deskpro ticket custom field definitions.',
         inputSchema: [
             'type' => 'object',
@@ -110,6 +114,7 @@ class LookupTools
      */
     #[McpTool(
         name: 'deskpro_list_filters',
+        readOnlyHint: true,
         description: 'List saved Deskpro ticket filters (views).',
         inputSchema: [
             'type' => 'object',

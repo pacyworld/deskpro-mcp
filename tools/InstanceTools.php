@@ -34,6 +34,7 @@ class InstanceTools
      */
     #[McpTool(
         name: 'deskpro_list_instances',
+        readOnlyHint: true,
         description: 'List all configured Deskpro instances. Shows which instance is the current default.',
         inputSchema: [
             'type' => 'object',

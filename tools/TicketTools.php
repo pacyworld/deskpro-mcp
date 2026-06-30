@@ -34,6 +34,7 @@ class TicketTools
      */
     #[McpTool(
         name: 'deskpro_get_ticket',
+        readOnlyHint: true,
         description: 'Get a Deskpro ticket by ID. Returns ticket details including subject, status, agent, department, and messages.',
         inputSchema: [
             'type' => 'object',
@@ -167,6 +168,7 @@ class TicketTools
      */
     #[McpTool(
         name: 'deskpro_search_tickets',
+        readOnlyHint: true,
         description: 'Search Deskpro tickets by keyword, status, agent, department, or date range.',
         inputSchema: [
             'type' => 'object',
@@ -230,6 +232,7 @@ class TicketTools
      */
     #[McpTool(
         name: 'deskpro_list_tickets',
+        readOnlyHint: true,
         description: 'List Deskpro tickets with pagination and optional filters.',
         inputSchema: [
             'type' => 'object',

@@ -40,6 +40,7 @@ class MetaTools
      */
     #[McpTool(
         name: 'deskpro_help',
+        readOnlyHint: true,
         description: 'Get context-aware help on how to use Deskpro MCP tools.',
         inputSchema: [
             'type' => 'object',
@@ -84,6 +85,7 @@ class MetaTools
      */
     #[McpTool(
         name: 'deskpro_tool_categories',
+        readOnlyHint: true,
         description: 'Get a list of tool categories and their descriptions.',
         inputSchema: [
             'type' => 'object',
@@ -172,6 +174,7 @@ class MetaTools
      */
     #[McpTool(
         name: 'deskpro_usage_examples',
+        readOnlyHint: true,
         description: 'Get common workflow examples for Deskpro operations.',
         inputSchema: [
             'type' => 'object',
@@ -252,6 +255,7 @@ class MetaTools
      */
     #[McpTool(
         name: 'deskpro_server_info',
+        readOnlyHint: true,
         description: 'Get information about this Deskpro MCP server including version, capabilities, and configured instances.'
     )]
     public function deskpro_server_info(): string
@@ -294,6 +298,7 @@ class MetaTools
      */
     #[McpTool(
         name: 'deskpro_error_guide',
+        readOnlyHint: true,
         description: 'Get information about common error codes and how to resolve them.',
         inputSchema: [
             'type' => 'object',

@@ -83,6 +83,7 @@ class TicketActionTools
      */
     #[McpTool(
         name: 'deskpro_get_messages',
+        readOnlyHint: true,
         description: 'Get messages (replies and notes) for a Deskpro ticket.',
         inputSchema: [
             'type' => 'object',
