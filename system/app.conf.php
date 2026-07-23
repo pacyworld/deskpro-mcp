@@ -7,7 +7,7 @@
 // Application Info
 define('APPLICATION_NAME', 'DeskproMCP');
 define('APPLICATION_SLUG', 'deskpro-mcp');
-define('APPLICATION_VERSION', '1.1.2');
+define('APPLICATION_VERSION', '1.1.3');
 define('APPLICATION_WEBSITE', 'https://pacyworld.dev/pacyworld/deskpro-mcp');
 
 // Directory Structure
