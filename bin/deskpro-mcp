@@ -107,8 +107,22 @@ debug("Registered tools: MetaTools");
 
 // --- Transport ---
 
-$transport = new \EnchiladaMCP\StdioTransport($server);
+// The application owns the event loop (strict opt-in): shared with
+// the stdio transport (reactor I/O) and the tools' HTTP path, where
+// Tortilla\HttpClient parks the dispatch fiber on it during Deskpro
+// API waits. null without vendored Comal: blocking I/O, progress flow
+// via the HttpClient poll loop.
+$loop = \Enchilada\Tortilla\ComalEventLoop::create();
+$manager->setHttpTransport($loop, $server->tick(...));
+
+// Primitives in (handler, progress emitter), notifier back out —
+// only the composition root knows both sides of the contract.
+$transport = new \Enchilada\Tortilla\StdioTransport($server->handleRequest(...), $server->tick(...));
 $transport->setLogger('debug');
+if ($loop !== null) {
+    $transport->setLoop($loop);      // opts into reactor I/O
+}
+$server->setNotifier($transport->sendNotification(...));
 
 // Enter event loop
 $transport->run();

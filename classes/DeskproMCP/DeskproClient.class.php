@@ -13,16 +13,35 @@
 
 namespace DeskproMCP;
 
+// EnchiladaMultiHTTP lives in the HTTP/ library directory but the
+// class name matches no vendored file or directory name, so the
+// framework autoloader's guess patterns miss it and spl_autoload
+// lowercases on case-sensitive filesystems.
+if (!class_exists('EnchiladaMultiHTTP', false)) {
+    require_once dirname(__DIR__, 2) . '/libraries/HTTP/EnchiladaMultiHTTP.class.php';
+}
+
 /**
  * DeskproClient - Deskpro REST API v2 HTTP client.
  *
- * Wraps EnchiladaHTTP with pluggable authentication supporting
- * both API Key and OAuth Bearer token modes.
+ * Uses Enchilada\Tortilla\HttpClient (loop-aware facade over
+ * EnchiladaMultiHTTP) with pluggable authentication supporting both
+ * API Key and OAuth Bearer token modes. When an EventLoop is injected
+ * and the caller runs inside a transport dispatch fiber, API waits
+ * park the fiber instead of blocking the server; otherwise the
+ * client's poll loop keeps progress notifications flowing during long
+ * waits (incl. token refreshes).
  */
 class DeskproClient
 {
-    /** @var \EnchiladaHTTP */
-    private \EnchiladaHTTP $http;
+    /** @var \Enchilada\Tortilla\HttpClient */
+    private \Enchilada\Tortilla\HttpClient $http;
+
+    /** @var \Enchilada\Tortilla\EventLoop|null Shared event loop (token refresh path) */
+    private ?\Enchilada\Tortilla\EventLoop $loop = null;
+
+    /** @var \Closure|null Progress emitter (token refresh path) */
+    private ?\Closure $progress = null;
 
     /** @var string */
     private string $siteUrl;
@@ -57,9 +76,14 @@ class DeskproClient
      * @param array  $config       Instance configuration
      * @param string $instanceName Instance name for token persistence
      * @param string|null $configPath Path to config file for persisting refreshed tokens
+     * @param \Enchilada\Tortilla\EventLoop|null $loop    Event loop shared with the stdio transport
+     * @param callable|null                      $progress function(): void — progress emitter (blocking mode)
      */
-    public function __construct(array $config, string $instanceName = 'default', ?string $configPath = null)
+    public function __construct(array $config, string $instanceName = 'default', ?string $configPath = null,
+        ?\Enchilada\Tortilla\EventLoop $loop = null, ?callable $progress = null)
     {
+        $this->loop = $loop;
+        $this->progress = $progress !== null ? $progress(...) : null;
         $this->siteUrl = rtrim($config['site_url'] ?? '', '/');
         $this->authMethod = $config['auth_method'] ?? 'apikey';
         $this->instanceName = $instanceName;
@@ -78,8 +102,19 @@ class DeskproClient
             $this->loadTokens($config);
         }
 
-        $this->http = new \EnchiladaHTTP($this->siteUrl . '/api/v2');
-        $this->http->setTimeout(30);
+        $multi = new \EnchiladaMultiHTTP($this->siteUrl . '/api/v2');
+        $multi->setTimeout(30);
+        $this->http = new \Enchilada\Tortilla\HttpClient($multi, $this->loop, $this->progress);
+    }
+
+    /**
+     * Map the curl_multi transport-failure slot (null) to this class's
+     * historical false contract.
+     */
+    private function call(string $endpoint, ?array $data, string $verb, array $headers)
+    {
+        $result = $this->http->call($endpoint, $data, $verb, $headers);
+        return $result === null ? false : $result;
     }
 
     /**
@@ -93,7 +128,7 @@ class DeskproClient
     {
         $this->ensureToken();
         $headers = $this->buildHeaders();
-        return $this->http->call($endpoint, $params, 'GET', $headers);
+        return $this->call($endpoint, $params, 'GET', $headers);
     }
 
     /**
@@ -107,7 +142,7 @@ class DeskproClient
     {
         $this->ensureToken();
         $headers = $this->buildHeaders();
-        return $this->http->call($endpoint, $data, 'POST', $headers);
+        return $this->call($endpoint, $data, 'POST', $headers);
     }
 
     /**
@@ -121,7 +156,7 @@ class DeskproClient
     {
         $this->ensureToken();
         $headers = $this->buildHeaders();
-        $result = $this->http->call($endpoint, $data, 'PUT', $headers);
+        $result = $this->call($endpoint, $data, 'PUT', $headers);
         // Deskpro returns 204 No Content on successful PUT (empty body).
         if ($result === false && $this->http->getHttpCode() >= 200 && $this->http->getHttpCode() < 300) {
             return ['success' => true];
@@ -139,7 +174,7 @@ class DeskproClient
     {
         $this->ensureToken();
         $headers = $this->buildHeaders();
-        return $this->http->call($endpoint, null, 'DELETE', $headers);
+        return $this->call($endpoint, null, 'DELETE', $headers);
     }
 
     /**
@@ -275,8 +310,9 @@ class DeskproClient
 
         fwrite(STDERR, "[deskpro-mcp] Refreshing access token...\n");
 
-        $refreshHttp = new \EnchiladaHTTP($this->siteUrl);
-        $refreshHttp->setTimeout(15);
+        $refreshMulti = new \EnchiladaMultiHTTP($this->siteUrl);
+        $refreshMulti->setTimeout(15);
+        $refreshHttp = new \Enchilada\Tortilla\HttpClient($refreshMulti, $this->loop, $this->progress);
 
         $result = $refreshHttp->call(
             'agent-api/authenticate/refresh',
