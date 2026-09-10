@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- Enchilada transport split: `EnchiladaMCP` re-vendored as the slim protocol core (gains `Logger`, `InstanceRegistry`, `ToolWarningInterface`); the stdio transport moves to `Enchilada\Tortilla` with the composition root wired in `bin/deskpro-mcp`. No Comal vendored, so the transport runs deterministic blocking I/O with a startup NOTE.
+- `DeskproClient` now drives `EnchiladaMultiHTTP` through `Tortilla\HttpClient` — both the main API surfaces and the token-refresh POST — so progress notifications flow during long Deskpro API waits on blocking stdio; `InstanceManager::setHttpTransport()` wires the loop/progress from the composition root. Transport failures map to the historical `false` contract.
+- HTTP libraries moved to `libraries/HTTP/` and `EnchiladaMultiHTTP` added.
+
 ## [1.1.1] - 2026-06-30
 
 ### Added

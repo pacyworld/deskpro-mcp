@@ -32,6 +32,12 @@ class InstanceManager
     /** @var string|null Path to config file (for token persistence) */
     private ?string $configPath;
 
+    /** @var \Enchilada\Tortilla\EventLoop|null Event loop propagated to created Clients */
+    private ?\Enchilada\Tortilla\EventLoop $loop = null;
+
+    /** @var \Closure|null Progress emitter propagated to created Clients */
+    private ?\Closure $progress = null;
+
     /**
      * Create a new InstanceManager.
      *
@@ -52,6 +58,22 @@ class InstanceManager
         $this->instances = $instances;
         $this->default = $default;
         $this->configPath = $configPath;
+    }
+
+    /**
+     * Provide the HTTP transport context for subsequently created
+     * Clients: the event loop the stdio transport also runs on (so
+     * Tortilla\HttpClient fiber-park waits are driven by that loop's
+     * timers) and the server's progress emitter (so blocking-mode poll
+     * loops keep notifications/progress flowing during long API waits).
+     *
+     * @param \Enchilada\Tortilla\EventLoop|null $loop     Shared event loop, or null (blocking waits)
+     * @param callable|null                      $progress function(): void progress emitter
+     */
+    public function setHttpTransport(?\Enchilada\Tortilla\EventLoop $loop, ?callable $progress): void
+    {
+        $this->loop = $loop;
+        $this->progress = $progress !== null ? $progress(...) : null;
     }
 
     /**
@@ -143,7 +165,9 @@ class InstanceManager
             $this->clients[$name] = new DeskproClient(
                 $this->instances[$name],
                 $name,
-                $this->configPath
+                $this->configPath,
+                $this->loop,
+                $this->progress
             );
         }
 
