@@ -10,7 +10,17 @@
  *   php bin/deskpro-mcp
  *
  * Environment:
- *   DESKPRO_CONFIG  Path to deskpro.json configuration file
+ *   DESKPRO_CONFIG          Path to deskpro.json configuration file
+ *   DESKPRO_MCP_LOG         Path to a log file (enables durable file logging)
+ *   DESKPRO_MCP_LOG_LEVEL   debug|info|error (default: debug when a log file is set)
+ *   DESKPRO_MCP_LOG_STDERR  Mirror log lines to STDERR (default: off; set to 1 to enable)
+ *   DESKPRO_MCP_IO_MODE     auto|reactor|blocking (default: auto)
+ *
+ * CLI flags:
+ *   --config=PATH      Path to deskpro.json
+ *   --log=PATH         Log file path (overrides DESKPRO_MCP_LOG)
+ *   --log-level=LEVEL  debug|info|error
+ *   --io-mode=MODE     auto|reactor|blocking (transport I/O strategy)
  *
  * @package    DeskproMCP
  * @author     Daniel Morante
@@ -21,18 +31,41 @@
 // Enchilada Framework bootstrap
 require_once dirname(__DIR__) . '/system/bootstrap.inc.php';
 
+use EnchiladaMCP\Logger;
 use DeskproMCP\InstanceManager;
 
 // --- Configuration ---
 
 $configPath = getenv('DESKPRO_CONFIG') ?: null;
+$logPath = getenv('DESKPRO_MCP_LOG') ?: null;
+$logLevel = getenv('DESKPRO_MCP_LOG_LEVEL') ?: 'debug';
+// Stderr mirroring is opt-in. stdout is the protocol channel and stderr
+// is only as reliable as the host's willingness to drain it: a host that
+// captures stderr and never reads it will fill the pipe and stall the
+// server (observed on Windows, where the stream cannot be made
+// non-blocking). The log file is the durable diagnostic channel.
+$stderrEnv = getenv('DESKPRO_MCP_LOG_STDERR');
+$logStderr = ($stderrEnv === false) ? false : (bool)$stderrEnv;
+$ioMode = getenv('DESKPRO_MCP_IO_MODE') ?: null;
 
-// Check CLI argument: --config=/path/to/deskpro.json
+// Check CLI arguments: --config=/path/to/deskpro.json, --log=/path/to/file, --log-level=debug
 foreach ($argv ?? [] as $arg) {
     if (str_starts_with($arg, '--config=')) {
         $configPath = substr($arg, 9);
     }
+    if (str_starts_with($arg, '--log=')) {
+        $logPath = substr($arg, 6);
+    }
+    if (str_starts_with($arg, '--log-level=')) {
+        $logLevel = substr($arg, 12);
+    }
+    if (str_starts_with($arg, '--io-mode=')) {
+        $ioMode = substr($arg, 10);
+    }
 }
+
+$logLevelValue = Logger::levelFromString($logLevel) ?? Logger::LEVEL_DEBUG;
+$logger = new Logger($logPath, $logLevelValue, $logStderr, APPLICATION_SLUG);
 
 // Default config location
 if ($configPath === null) {
@@ -58,30 +91,35 @@ if ($configPath === null || !file_exists($configPath)) {
 
 // --- Bootstrap ---
 
-function debug(string $message): void
-{
-    fwrite(STDERR, "[deskpro-mcp] " . $message . "\n");
+if ($logPath !== null && @file_put_contents($logPath, '', FILE_APPEND) === false) {
+    fwrite(STDERR, "[deskpro-mcp] WARNING: Log file not writable: {$logPath}\n");
+    $logger = new Logger(null, $logLevelValue, $logStderr, APPLICATION_SLUG);
 }
+
+$logger->info(APPLICATION_NAME . ' ' . APPLICATION_VERSION . " starting (pid " . getmypid() . ", php " . PHP_VERSION . ')');
+$logger->info("Log file: " . ($logPath ?? '(disabled — set DESKPRO_MCP_LOG to enable)'));
 
 try {
     $manager = InstanceManager::fromFile($configPath);
 } catch (\Exception $e) {
     fwrite(STDERR, "[deskpro-mcp] ERROR: " . $e->getMessage() . "\n");
+    $logger->error('Configuration load failed: ' . $e->getMessage());
     exit(1);
 }
 
 $instanceCount = $manager->count();
-debug("Loaded {$instanceCount} instance(s) from {$configPath} (default: {$manager->getDefault()})");
+$logger->info("Loaded {$instanceCount} instance(s) from {$configPath} (default: {$manager->getDefault()})");
 
 // Log per-instance auth info
 foreach ($manager->listInstances() as $name => $info) {
     $marker = $info['is_default'] ? ' [default]' : '';
-    debug("  {$name}: {$info['auth_method']}{$marker}");
+    $logger->info("  {$name}: {$info['auth_method']}{$marker}");
 }
 
 // --- Create MCP Server ---
 
 $server = new \EnchiladaMCP\McpServer(APPLICATION_SLUG, APPLICATION_VERSION);
+$server->setLogger($logger);
 
 $server->setInstructions(
     'Deskpro MCP server for helpdesk ticket management. '
@@ -91,19 +129,19 @@ $server->setInstructions(
 
 // Register tools
 $server->register(new \InstanceTools($manager));
-debug("Registered tools: InstanceTools");
+$logger->debug("Registered tools: InstanceTools");
 
 $server->register(new \TicketTools($manager));
-debug("Registered tools: TicketTools");
+$logger->debug("Registered tools: TicketTools");
 
 $server->register(new \TicketActionTools($manager));
-debug("Registered tools: TicketActionTools");
+$logger->debug("Registered tools: TicketActionTools");
 
 $server->register(new \LookupTools($manager));
-debug("Registered tools: LookupTools");
+$logger->debug("Registered tools: LookupTools");
 
 $server->register(new \MetaTools($manager, APPLICATION_VERSION));
-debug("Registered tools: MetaTools");
+$logger->debug("Registered tools: MetaTools");
 
 // --- Transport ---
 
@@ -118,13 +156,23 @@ $manager->setHttpTransport($loop, $server->tick(...));
 // Primitives in (handler, progress emitter), notifier back out —
 // only the composition root knows both sides of the contract.
 $transport = new \Enchilada\Tortilla\StdioTransport($server->handleRequest(...), $server->tick(...));
-$transport->setLogger('debug');
+$transport->setLogger($logger);
 if ($loop !== null) {
     $transport->setLoop($loop);      // opts into reactor I/O
 }
 $server->setNotifier($transport->sendNotification(...));
 
+// I/O mode override and diagnostics land on the logger, never stdout.
+if ($ioMode !== null) {
+    try {
+        $transport->setIoMode($ioMode);
+    } catch (\InvalidArgumentException $e) {
+        fwrite(STDERR, "[deskpro-mcp] ERROR: " . $e->getMessage() . "\n");
+        exit(1);
+    }
+}
+
 // Enter event loop
 $transport->run();
 
-debug("MCP server stopped");
+$logger->info("MCP server stopped");
