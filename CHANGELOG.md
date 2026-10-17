@@ -7,15 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.5] - 2026-09-13
+
+### Fixed
+- Stdio no longer stalls on hosts whose stdin never reports EOF or is a regular file (re-vendored Tortilla `StdioTransport`: bounded no-EOF read retries, regular-file stdin degrades to blocking, in-flight requests are answered before an EOF stop)
+- A response body that is not valid JSON completes the request with an error instead of leaving the wait loop spinning (re-vendored `EnchiladaMultiHTTP`)
+- Diagnostics no longer write unbounded output to stderr: they go through `EnchiladaMCP\Logger`, silent by default, with a `DESKPRO_MCP_LOG` file and a budgeted stderr mirror; `--log`, `--log-level` and `--io-mode` flags
+
+## [1.1.4] - 2026-09-10
+
 ### Changed
 - Vendored HTTP library layout moved from `libraries/HTTP/` to eponymous directories (`libraries/EnchiladaHTTP/`, `libraries/EnchiladaMultiHTTP/`), which the framework autoloader resolves natively for legacy global classes — the guarded `require_once` in `DeskproClient` is gone
-
-## [1.1.4] - 2026-09-09
-
-### Changed
 - Enchilada transport split: `EnchiladaMCP` re-vendored as the slim protocol core (gains `Logger`, `InstanceRegistry`, `ToolWarningInterface`); the stdio transport moves to `Enchilada\Tortilla` with the composition root wired in `bin/deskpro-mcp`. No Comal vendored, so the transport runs deterministic blocking I/O with a startup NOTE.
 - `DeskproClient` now drives `EnchiladaMultiHTTP` through `Tortilla\HttpClient` — both the main API surfaces and the token-refresh POST — so progress notifications flow during long Deskpro API waits on blocking stdio; `InstanceManager::setHttpTransport()` wires the loop/progress from the composition root. Transport failures map to the historical `false` contract.
 - HTTP libraries moved to `libraries/HTTP/` and `EnchiladaMultiHTTP` added.
+
+## [1.1.3] - 2026-07-23
+
+### Fixed
+- Added the missing vendored `EnchiladaMCP/ToolResult.class.php`, which `McpServer` requires
+
+## [1.1.2] - 2026-07-23
+
+### Changed
+- Re-vendored `EnchiladaMCP` with graceful lifecycle handling: an `onReinitialize` hook, and detection of stdout write failures
 
 ## [1.1.1] - 2026-06-30
 
@@ -69,5 +84,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Forgejo release workflow (version stamp, PHAR upload on tagged release)
 - Comprehensive documentation: README, SETUP.md, TOOLS.md, SKILL.md
 
+[1.1.5]: https://pacyworld.dev/pacyworld/deskpro-mcp/releases/tag/v1.1.5
+[1.1.4]: https://pacyworld.dev/pacyworld/deskpro-mcp/releases/tag/v1.1.4
+[1.1.3]: https://pacyworld.dev/pacyworld/deskpro-mcp/releases/tag/v1.1.3
+[1.1.2]: https://pacyworld.dev/pacyworld/deskpro-mcp/releases/tag/v1.1.2
+[1.1.1]: https://pacyworld.dev/pacyworld/deskpro-mcp/releases/tag/v1.1.1
 [1.1.0]: https://pacyworld.dev/pacyworld/deskpro-mcp/releases/tag/v1.1.0
 [1.0.0]: https://pacyworld.dev/pacyworld/deskpro-mcp/releases/tag/v1.0.0
