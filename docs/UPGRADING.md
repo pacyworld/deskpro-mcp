@@ -5,15 +5,16 @@ Developer/agent-facing. Read this **before** touching `libraries/`,
 
 ## 1. The transport split (September 2026) changed the rules
 
-Three independent libraries, vendored byte-identical from canonical
-upstream **master** (pull first, then copy — never from another
-consumer's tree):
+Vendored as byte-identical copies from canonical upstream **master**
+(pull first, then copy — never from another consumer's tree):
 
 | Vendored dir | Source | What it is |
 |---|---|---|
 | `libraries/EnchiladaMCP/` | `Enchilada/Extras` MCP/ | Protocol core. No I/O, no loop, no framework deps. |
 | `libraries/Enchilada/Tortilla/` | `Enchilada/Tortilla` src/ | Wire transports, `EventLoop` port, `HttpClient`, `RequestEra`. |
-| `libraries/EnchiladaHTTP/` + `EnchiladaMultiHTTP/` | Extras HTTP/ | curl engines (legacy globals, eponymous dirs). **Frozen.** |
+| `libraries/EnchiladaCurl/` + `EnchiladaMultiHTTP/` + `EnchiladaWorkerHTTP/` | Extras HTTP/ | curl clients on the abstract `EnchiladaCurl` base (legacy globals, eponymous dirs); vendor all three together with Tortilla. |
+| `libraries/EnchiladaHTTP/` | Extras HTTP/ | Standalone blocking client. |
+| `tests/enchilada-curl/` | daniel/engineering-docs enchilada-extras/curl-behaviour-suite/ | curl behaviour suite + one-door-to-curl lint, run in CI against `libraries/`. Re-vendor with HTTP/. |
 
 (No Comal → stdio runs its supported blocking mode; progress
 notifications keep the host alive during long calls.)
