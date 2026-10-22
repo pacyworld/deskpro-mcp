@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-22
+
 ### Changed
 - Re-vendored the Enchilada libraries onto the EnchiladaCurl split: new `libraries/EnchiladaCurl/` (abstract curl base) and `libraries/EnchiladaWorkerHTTP/` (curl executed in worker processes), with `EnchiladaMultiHTTP` alongside on the same base; `EnchiladaHTTP` stays the standalone blocking client. `EnchiladaMCP` refreshed (adds `ElicitationRequired`, `McpComplete`, `McpPrompt`, `mcp.inc.php`) and `Tortilla` refreshed (adds `OAuthCallbackHelper`)
 - CI FreeBSD job installs php84-curl and php84-tokenizer
